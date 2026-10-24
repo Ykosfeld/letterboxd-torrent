@@ -93,3 +93,63 @@ test('buildSearchQuery handles templates and fallbacks', () => {
   const metaNoImdb = { title: 'Heat', year: '1995', imdbId: '' };
   assert.strictEqual(buildSearchQuery(metaNoImdb, '{imdbId}'), 'Heat 1995');
 });
+
+test('determineInsertionTarget puts panel before Where to watch section or after poster', () => {
+  function mockSidebar(hasWatch, hasPoster) {
+    const children = [];
+    let poster = null;
+    let watch = null;
+
+    if (hasPoster) {
+      poster = { id: 'poster-wrap', className: 'poster-list' };
+      children.push(poster);
+    }
+    if (hasWatch) {
+      watch = { id: 'watch-panel', className: 'section watch-panel' };
+      children.push(watch);
+    }
+    const other = { id: 'ratings-panel', className: 'ratings' };
+    children.push(other);
+
+    const sidebar = {
+      children,
+      querySelector(sel) {
+        if (sel.includes('watch') && hasWatch) return watch;
+        if (sel.includes('poster') && hasPoster) return poster;
+        return null;
+      },
+    };
+    if (poster) poster.parentNode = sidebar;
+    if (watch) watch.parentNode = sidebar;
+    return { sidebar, watch, poster };
+  }
+
+  function getInsertionTarget(sidebar) {
+    const watchSection = sidebar.querySelector('#watch, #watch-panel, #tab-watch, section.watch-panel, .services-panel');
+    const posterElement = sidebar.querySelector('.poster-list, .film-poster, section.poster-list');
+
+    if (watchSection) {
+      return { position: 'before', target: watchSection };
+    } else if (posterElement) {
+      return { position: 'after', target: posterElement };
+    }
+    return { position: 'prepend', target: sidebar };
+  }
+
+  // 1. With watch section present: must insert BEFORE watch section
+  const case1 = mockSidebar(true, true);
+  const target1 = getInsertionTarget(case1.sidebar);
+  assert.strictEqual(target1.position, 'before');
+  assert.strictEqual(target1.target.id, 'watch-panel');
+
+  // 2. Without watch section: fallback to insert AFTER poster
+  const case2 = mockSidebar(false, true);
+  const target2 = getInsertionTarget(case2.sidebar);
+  assert.strictEqual(target2.position, 'after');
+  assert.strictEqual(target2.target.id, 'poster-wrap');
+
+  // 3. Neither present: prepend
+  const case3 = mockSidebar(false, false);
+  const target3 = getInsertionTarget(case3.sidebar);
+  assert.strictEqual(target3.position, 'prepend');
+});

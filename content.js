@@ -205,13 +205,23 @@
     panel.appendChild(searchBar);
     panel.appendChild(body);
 
-    // Injection position: below #watch / #watch-panel or top of sidebar
-    const watchPanel = sidebar.querySelector('#watch, #watch-panel, .services-panel, .track-this');
-    if (watchPanel && watchPanel.parentNode === sidebar) {
-      if (watchPanel.nextSibling) {
-        sidebar.insertBefore(panel, watchPanel.nextSibling);
+    // Injection position: below the film poster and directly above "Where to watch"
+    const watchSection = sidebar.querySelector(
+      '#watch, #watch-panel, #tab-watch, section.watch-panel, .services-panel, section.watch, section:has([data-track-action="Watch"]), [data-testid="offer"]'
+    );
+    const posterElement = sidebar.querySelector(
+      '.poster-list, .film-poster, section.poster-list, div.poster'
+    );
+
+    if (watchSection) {
+      const targetBlock = watchSection.closest('aside.sidebar > *') || watchSection;
+      targetBlock.parentNode.insertBefore(panel, targetBlock);
+    } else if (posterElement) {
+      const posterBlock = posterElement.closest('aside.sidebar > *') || posterElement;
+      if (posterBlock.nextSibling) {
+        posterBlock.parentNode.insertBefore(panel, posterBlock.nextSibling);
       } else {
-        sidebar.appendChild(panel);
+        posterBlock.parentNode.appendChild(panel);
       }
     } else {
       sidebar.prepend(panel);
