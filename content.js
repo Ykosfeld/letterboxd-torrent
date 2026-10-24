@@ -108,10 +108,53 @@
   }
 
   /* ==========================================================================
-     3. UI Construction (Strict XSS Prevention)
+     3. DOM Locators & UI Construction (Strict XSS Prevention)
      ========================================================================== */
 
-  function renderPanel(sidebar) {
+  function findWhereToWatchSection() {
+    // 1. Direct standard IDs and classes on Letterboxd
+    const direct = document.querySelector(
+      '#watch, #watch-panel, #tab-watch, section.watch-options, section.where-to-watch, .watch-options, .js-watch-options, section.watch-panel, [data-track-category="WatchOptions"]'
+    );
+    if (direct) return direct;
+
+    // 2. Element containing JustWatch link
+    const jwLink = document.querySelector('a[href*="justwatch.com"]');
+    if (jwLink) {
+      const container = jwLink.closest('section, div.box, div[class*="watch"]');
+      if (container) return container;
+    }
+
+    // 3. Provider links or offers
+    const offer = document.querySelector('a[data-track-action="WatchOption"], div[data-testid="offer"]');
+    if (offer) {
+      const container = offer.closest('section, div.box, div[class*="watch"]');
+      if (container) return container;
+    }
+
+    // 4. Element with "Where to Watch" header text
+    const headings = document.querySelectorAll('h2, h3, h4, .section-heading, p.ui-block-heading');
+    for (const h of headings) {
+      if (/where to watch/i.test(h.textContent)) {
+        return h.closest('section, div.box, div[class*="watch"]') || h.parentElement;
+      }
+    }
+
+    return null;
+  }
+
+  function findPosterContainer() {
+    const poster = document.querySelector('.film-poster, .poster-list, section.poster-list, div.poster');
+    if (!poster) return null;
+
+    // Check if there is a stats strip below poster
+    const stats = poster.parentElement.querySelector('.film-stats, ul.stats, .stats-strip') ||
+                  (poster.nextElementSibling && /stats/i.test(poster.nextElementSibling.className) ? poster.nextElementSibling : null);
+
+    return stats || poster;
+  }
+
+  function renderPanel() {
     let existing = document.getElementById('qbit-letterboxd-panel');
     if (existing) existing.remove();
 
@@ -205,26 +248,27 @@
     panel.appendChild(searchBar);
     panel.appendChild(body);
 
-    // Injection position: below the film poster and directly above "Where to watch"
-    const watchSection = sidebar.querySelector(
-      '#watch, #watch-panel, #tab-watch, section.watch-panel, .services-panel, section.watch, section:has([data-track-action="Watch"]), [data-testid="offer"]'
-    );
-    const posterElement = sidebar.querySelector(
-      '.poster-list, .film-poster, section.poster-list, div.poster'
-    );
+    // Injection position: below the film poster/stats and directly above "Where to watch" on the left column
+    const watchSection = findWhereToWatchSection();
+    const posterBlock = findPosterContainer();
 
     if (watchSection) {
-      const targetBlock = watchSection.closest('aside.sidebar > *') || watchSection;
+      const targetBlock = watchSection.closest('div.film-poster-overview > *, section, div.sidebar-block') || watchSection;
       targetBlock.parentNode.insertBefore(panel, targetBlock);
-    } else if (posterElement) {
-      const posterBlock = posterElement.closest('aside.sidebar > *') || posterElement;
-      if (posterBlock.nextSibling) {
-        posterBlock.parentNode.insertBefore(panel, posterBlock.nextSibling);
+    } else if (posterBlock) {
+      const targetBlock = posterBlock.closest('div.film-poster-overview > *, section, div.sidebar-block') || posterBlock;
+      if (targetBlock.nextSibling) {
+        targetBlock.parentNode.insertBefore(panel, targetBlock.nextSibling);
       } else {
-        posterBlock.parentNode.appendChild(panel);
+        targetBlock.parentNode.appendChild(panel);
       }
     } else {
-      sidebar.prepend(panel);
+      const fallback = document.querySelector('aside.sidebar, .col-main, #content');
+      if (fallback) {
+        fallback.prepend(panel);
+      } else {
+        document.body.prepend(panel);
+      }
     }
 
     return { panel, body, searchInput, searchBar };
@@ -300,12 +344,14 @@
     results.forEach(item => {
       const row = document.createElement('div');
       row.className = 'qbit-result-item';
+      row.title = item.fileName;
 
-      const info = document.createElement('div');
-      info.className = 'qbit-item-info';
+      // 1. Top row: Badges, Size, Seeders/Leechers, and Download Button
+      const topRow = document.createElement('div');
+      topRow.className = 'qbit-item-top-row';
 
-      const titleRow = document.createElement('div');
-      titleRow.className = 'qbit-item-title-row';
+      const metaGroup = document.createElement('div');
+      metaGroup.className = 'qbit-item-meta-group';
 
       // Badges
       const badges = extractBadges(item.fileName);
@@ -313,37 +359,26 @@
         const badgeSpan = document.createElement('span');
         badgeSpan.className = `qbit-badge ${b.class}`;
         badgeSpan.textContent = b.text;
-        titleRow.appendChild(badgeSpan);
+        metaGroup.appendChild(badgeSpan);
       });
 
-      // Release Name
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'qbit-item-name';
-      nameSpan.textContent = item.fileName;
-      nameSpan.title = item.fileName;
-      titleRow.appendChild(nameSpan);
-
-      // Metadata line: Size + Seeders + Leechers
-      const metaRow = document.createElement('div');
-      metaRow.className = 'qbit-item-meta';
-
+      // Size
       const sizeSpan = document.createElement('span');
+      sizeSpan.className = 'qbit-size';
       sizeSpan.textContent = formatBytes(item.fileSize);
+      metaGroup.appendChild(sizeSpan);
 
+      // Seeders
       const seedersSpan = document.createElement('span');
       seedersSpan.className = 'qbit-seeders';
       seedersSpan.textContent = `▲ ${item.nbSeeders}`;
+      metaGroup.appendChild(seedersSpan);
 
+      // Leechers
       const leechersSpan = document.createElement('span');
       leechersSpan.className = 'qbit-leechers';
       leechersSpan.textContent = `▼ ${item.nbLeechers}`;
-
-      metaRow.appendChild(sizeSpan);
-      metaRow.appendChild(seedersSpan);
-      metaRow.appendChild(leechersSpan);
-
-      info.appendChild(titleRow);
-      info.appendChild(metaRow);
+      metaGroup.appendChild(leechersSpan);
 
       // Download Button
       const downloadBtn = document.createElement('button');
@@ -381,8 +416,17 @@
         }
       });
 
-      row.appendChild(info);
-      row.appendChild(downloadBtn);
+      topRow.appendChild(metaGroup);
+      topRow.appendChild(downloadBtn);
+
+      // 2. Bottom row: Full width release name
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'qbit-item-name';
+      nameSpan.textContent = item.fileName;
+      nameSpan.title = item.fileName;
+
+      row.appendChild(topRow);
+      row.appendChild(nameSpan);
       list.appendChild(row);
     });
 
@@ -464,13 +508,16 @@
   }
 
   async function init() {
-    const sidebar = document.querySelector('aside.sidebar');
-    if (!sidebar) {
-      console.log('[qBit] Sidebar não encontrada na página atual.');
+    const watchSection = findWhereToWatchSection();
+    const posterBlock = findPosterContainer();
+    const fallbackSidebar = document.querySelector('aside.sidebar, .col-main, #content');
+
+    if (!watchSection && !posterBlock && !fallbackSidebar) {
+      console.log('[qBit] Elementos do filme não encontrados na página atual.');
       return;
     }
 
-    const { body, searchInput } = renderPanel(sidebar);
+    const { body, searchInput } = renderPanel();
 
     // Check configuration status first
     let statusResp;

@@ -94,62 +94,82 @@ test('buildSearchQuery handles templates and fallbacks', () => {
   assert.strictEqual(buildSearchQuery(metaNoImdb, '{imdbId}'), 'Heat 1995');
 });
 
-test('determineInsertionTarget puts panel before Where to watch section or after poster', () => {
-  function mockSidebar(hasWatch, hasPoster) {
-    const children = [];
+test('determineInsertionTarget targets left column before Where to watch section, avoiding right sidebar', () => {
+  function createMockPage(hasWatch, hasPoster, hasRightSidebar = true) {
     let poster = null;
     let watch = null;
+    let rightSidebar = null;
+
+    const leftCol = {
+      id: 'left-col',
+      className: 'film-poster-overview',
+      children: [],
+      closest() { return this; }
+    };
 
     if (hasPoster) {
-      poster = { id: 'poster-wrap', className: 'poster-list' };
-      children.push(poster);
+      poster = { id: 'poster-wrap', className: 'film-poster', parentNode: leftCol };
+      leftCol.children.push(poster);
     }
     if (hasWatch) {
-      watch = { id: 'watch-panel', className: 'section watch-panel' };
-      children.push(watch);
+      watch = { id: 'watch-options-section', className: 'section watch-options', parentNode: leftCol };
+      leftCol.children.push(watch);
     }
-    const other = { id: 'ratings-panel', className: 'ratings' };
-    children.push(other);
 
-    const sidebar = {
-      children,
+    if (hasRightSidebar) {
+      rightSidebar = {
+        id: 'right-actions-sidebar',
+        className: 'sidebar',
+        children: [{ id: 'user-actions', className: 'actions-panel' }]
+      };
+    }
+
+    const doc = {
       querySelector(sel) {
-        if (sel.includes('watch') && hasWatch) return watch;
-        if (sel.includes('poster') && hasPoster) return poster;
+        if (/watch/i.test(sel)) return watch;
+        if (/poster/i.test(sel)) return poster;
+        if (/sidebar/i.test(sel)) return rightSidebar;
         return null;
       },
+      querySelectorAll(sel) {
+        if (hasWatch) return [{ textContent: 'Where to Watch', closest: () => watch }];
+        return [];
+      }
     };
-    if (poster) poster.parentNode = sidebar;
-    if (watch) watch.parentNode = sidebar;
-    return { sidebar, watch, poster };
+
+    return { doc, leftCol, watch, poster, rightSidebar };
   }
 
-  function getInsertionTarget(sidebar) {
-    const watchSection = sidebar.querySelector('#watch, #watch-panel, #tab-watch, section.watch-panel, .services-panel');
-    const posterElement = sidebar.querySelector('.poster-list, .film-poster, section.poster-list');
+  function getInsertionTarget(doc) {
+    const watchSection = doc.querySelector('#watch, #watch-panel, #tab-watch, section.watch-options, section.where-to-watch, .watch-options');
+    const posterElement = doc.querySelector('.poster-list, .film-poster, section.poster-list, div.poster');
 
     if (watchSection) {
-      return { position: 'before', target: watchSection };
+      return { position: 'before', target: watchSection, column: 'left' };
     } else if (posterElement) {
-      return { position: 'after', target: posterElement };
+      return { position: 'after', target: posterElement, column: 'left' };
     }
-    return { position: 'prepend', target: sidebar };
+    const fallback = doc.querySelector('aside.sidebar');
+    return { position: 'prepend', target: fallback, column: 'right' };
   }
 
-  // 1. With watch section present: must insert BEFORE watch section
-  const case1 = mockSidebar(true, true);
-  const target1 = getInsertionTarget(case1.sidebar);
+  // 1. Where to watch present on left column: must insert BEFORE watch section on left column
+  const case1 = createMockPage(true, true, true);
+  const target1 = getInsertionTarget(case1.doc);
   assert.strictEqual(target1.position, 'before');
-  assert.strictEqual(target1.target.id, 'watch-panel');
+  assert.strictEqual(target1.target.id, 'watch-options-section');
+  assert.strictEqual(target1.column, 'left');
 
-  // 2. Without watch section: fallback to insert AFTER poster
-  const case2 = mockSidebar(false, true);
-  const target2 = getInsertionTarget(case2.sidebar);
+  // 2. Without where to watch: must insert AFTER poster on left column
+  const case2 = createMockPage(false, true, true);
+  const target2 = getInsertionTarget(case2.doc);
   assert.strictEqual(target2.position, 'after');
   assert.strictEqual(target2.target.id, 'poster-wrap');
+  assert.strictEqual(target2.column, 'left');
 
-  // 3. Neither present: prepend
-  const case3 = mockSidebar(false, false);
-  const target3 = getInsertionTarget(case3.sidebar);
+  // 3. Fallback when left column not found
+  const case3 = createMockPage(false, false, true);
+  const target3 = getInsertionTarget(case3.doc);
   assert.strictEqual(target3.position, 'prepend');
+  assert.strictEqual(target3.target.id, 'right-actions-sidebar');
 });
