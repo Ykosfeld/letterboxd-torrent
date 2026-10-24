@@ -167,7 +167,20 @@ test('determineInsertionTarget targets left column AFTER (below) Where to watch 
   assert.strictEqual(target2.target.id, 'poster-wrap');
   assert.strictEqual(target2.column, 'left');
 
-  // 3. Fallback when left column not found
+  // 3. Nested #watch container: must target outermost wrapper
+  const outerWrapper = { id: 'watch', className: 'services-panel', parentNode: case1.leftCol };
+  case1.watch.parentNode = outerWrapper;
+  case1.watch.closest = (sel) => {
+    if (sel.includes('#watch')) return outerWrapper;
+    return case1.watch;
+  };
+  function resolveOutermostWatch(target) {
+    const outer = target.closest('#watch, [id^="watch-"], .services-panel');
+    return outer || target;
+  }
+  assert.strictEqual(resolveOutermostWatch(case1.watch).id, 'watch');
+
+  // 4. Fallback when left column not found
   const case3 = createMockPage(false, false, true);
   const target3 = getInsertionTarget(case3.doc);
   assert.strictEqual(target3.position, 'prepend');

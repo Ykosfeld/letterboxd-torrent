@@ -10,6 +10,11 @@
 
   let currentFilmUrl = window.location.pathname;
   let currentSearchQuery = '';
+  let cachedResults = null;
+  let isAttaching = false;
+  let panelElement = null;
+  let panelBody = null;
+  let panelSearchInput = null;
 
   /* ==========================================================================
      1. Utility Functions
@@ -121,44 +126,91 @@
   }
 
   function findWhereToWatchBox() {
-    // 1. Check textual heading "WHERE TO WATCH"
-    const allElements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .section-heading, p, div, header');
-    for (const el of allElements) {
-      if (el.children.length === 0 && /^where to watch$/i.test(el.textContent.trim())) {
-        let cur = el;
-        while (cur && cur.parentElement && !isPageRootContainer(cur.parentElement)) {
-          if (cur.tagName === 'SECTION' || (cur.classList && (cur.classList.contains('box') || cur.classList.contains('where-to-watch') || cur.classList.contains('watch-options') || /watch/i.test(cur.className || '')))) {
-            return cur;
-          }
-          cur = cur.parentElement;
-        }
-        if (cur && !isPageRootContainer(cur)) return cur;
+    let target = null;
+
+    // 1. Check textual heading matching "Where to watch"
+    const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .title, .section-heading');
+    for (const h of headings) {
+      if (/where to watch/i.test(h.textContent || '')) {
+        target = h;
+        break;
       }
     }
 
     // 2. Check by JustWatch link
-    const jwLink = document.querySelector('a[href*="justwatch.com"]');
-    if (jwLink) {
-      let cur = jwLink;
+    if (!target) {
+      target = document.querySelector('a[href*="justwatch.com"]');
+    }
+
+    // 3. Check by standard class names or IDs
+    if (!target) {
+      target = document.querySelector('#watch, section.watch-panel, section.watch-options, section.where-to-watch, .watch-options, [data-track-category="WatchOptions"]');
+    }
+
+    if (!target) return null;
+
+    // Find the enclosing section or watch box
+    let box = target.closest('#watch, section.watch-panel, section.watch-options, section.where-to-watch, [data-track-category="WatchOptions"]') || target.closest('section');
+
+    if (!box) {
+      let cur = target;
       while (cur && cur.parentElement && !isPageRootContainer(cur.parentElement)) {
         if (cur.tagName === 'SECTION' || (cur.classList && (cur.classList.contains('box') || /watch/i.test(cur.className || '')))) {
-          return cur;
+          box = cur;
+          break;
         }
         cur = cur.parentElement;
       }
-      if (cur && !isPageRootContainer(cur)) return cur;
     }
 
-    // 3. Check by standard class names
-    const standard = document.querySelector('section.watch-options, section.where-to-watch, .watch-options, .js-watch-options, section.watch-panel, [data-track-category="WatchOptions"]');
-    if (standard && !isPageRootContainer(standard)) {
-      return standard;
+    if (!box || isPageRootContainer(box)) return null;
+
+    // If box is nested inside an outer watch container (e.g. #watch), target that outer wrapper
+    // so our panel is inserted AFTER the whole watch block, outside dynamic innerHTML replacements
+    const outerWrapper = box.closest('#watch, [id^="watch-"], .watch-panel-wrapper, .services-panel');
+    if (outerWrapper && !isPageRootContainer(outerWrapper) && outerWrapper.parentElement && !isPageRootContainer(outerWrapper.parentElement)) {
+      box = outerWrapper;
     }
 
-    return null;
+    return box;
+  }
+
+  function findPosterOrStatsContainer() {
+    const posterComp = document.querySelector('[data-component-class="LazyPoster"]') ||
+                       document.querySelector('.film-poster, .poster-list, section.poster-list, div[data-film-id]');
+    if (!posterComp) return null;
+
+    let cur = posterComp;
+    while (cur && cur.parentElement && !isPageRootContainer(cur.parentElement)) {
+      if (cur.parentElement.classList && (
+        cur.parentElement.classList.contains('col-6') ||
+        cur.parentElement.classList.contains('film-poster-overview') ||
+        cur.parentElement.classList.contains('sidebar') ||
+        cur.parentElement.classList.contains('poster-list')
+      )) {
+        break;
+      }
+      if (cur.tagName === 'SECTION' || (cur.classList && cur.classList.contains('react-component'))) {
+        if (cur.parentElement && !isPageRootContainer(cur.parentElement)) {
+          break;
+        }
+      }
+      cur = cur.parentElement;
+    }
+
+    let insertAfter = cur;
+    let next = cur ? cur.nextElementSibling : null;
+    while (next && (/stats|rating/i.test(next.className || '') || (next.querySelector && next.querySelector('[class*="stat"], .icon-watched, .icon-liked')))) {
+      insertAfter = next;
+      next = next.nextElementSibling;
+    }
+
+    return insertAfter;
   }
 
   function injectPanelBelowWhereToWatch(panel) {
+    if (!panel) return false;
+
     // 1. Try to find the "Where to watch" box and insert BELOW it
     const watchBox = findWhereToWatchBox();
     if (watchBox && watchBox.parentNode && !isPageRootContainer(watchBox.parentNode)) {
@@ -172,35 +224,19 @@
     }
 
     // 2. Fallback for films without Where to Watch (e.g. unreleased films like Sally 2025):
-    // Insert below the poster and its stats
-    const poster = document.querySelector('.film-poster, .poster-list, section.poster-list, div[data-film-id]');
-    if (poster) {
-      let cur = poster;
-      while (cur && cur.parentElement && !isPageRootContainer(cur.parentElement)) {
-        if (cur.parentElement.classList && (cur.parentElement.classList.contains('col-6') || cur.parentElement.classList.contains('film-poster-overview') || cur.parentElement.classList.contains('poster-list'))) {
-          break;
-        }
-        cur = cur.parentElement;
+    // Insert below the poster / stats in the left column
+    const posterBlock = findPosterOrStatsContainer();
+    if (posterBlock && posterBlock.parentNode && !isPageRootContainer(posterBlock.parentNode)) {
+      if (posterBlock.nextSibling) {
+        posterBlock.parentNode.insertBefore(panel, posterBlock.nextSibling);
+      } else {
+        posterBlock.parentNode.appendChild(panel);
       }
-
-      let insertAfter = cur;
-      const next = cur.nextElementSibling;
-      if (next && (/stats/i.test(next.className || '') || (next.querySelector && next.querySelector('[class*="stat"], .icon-watched, .icon-liked')))) {
-        insertAfter = next;
-      }
-
-      if (insertAfter && insertAfter.parentNode && !isPageRootContainer(insertAfter.parentNode)) {
-        if (insertAfter.nextSibling) {
-          insertAfter.parentNode.insertBefore(panel, insertAfter.nextSibling);
-        } else {
-          insertAfter.parentNode.appendChild(panel);
-        }
-        console.log('[qBit] Injetado abaixo do cartaz/stats (sem Where to Watch):', insertAfter);
-        return true;
-      }
+      console.log('[qBit] Injetado abaixo do cartaz/stats (sem Where to Watch):', posterBlock);
+      return true;
     }
 
-    // 3. Ultimate safe fallback: right sidebar or main container
+    // 3. Fallback: sidebar or main container
     const fallback = document.querySelector('aside.sidebar, .col-main, #content');
     if (fallback) {
       fallback.prepend(panel);
@@ -209,6 +245,51 @@
     }
 
     return false;
+  }
+
+  function ensurePanelInDOM() {
+    if (isAttaching) return;
+    if (!window.location.pathname.startsWith('/film/')) return;
+
+    const existingPanel = document.getElementById('qbit-letterboxd-panel');
+    const watchBox = findWhereToWatchBox();
+
+    if (existingPanel && existingPanel.isConnected) {
+      if (watchBox) {
+        // If watchBox exists, ensure panel is right after watchBox
+        if (existingPanel.previousElementSibling === watchBox) {
+          return; // Already perfectly positioned!
+        }
+        isAttaching = true;
+        try {
+          if (watchBox.nextSibling) {
+            watchBox.parentNode.insertBefore(existingPanel, watchBox.nextSibling);
+          } else {
+            watchBox.parentNode.appendChild(existingPanel);
+          }
+          console.log('[qBit] Painel reposicionado logo abaixo de Where to Watch.');
+        } finally {
+          setTimeout(() => { isAttaching = false; }, 50);
+        }
+        return;
+      } else {
+        // No watchBox and panel is in DOM
+        return;
+      }
+    }
+
+    // Panel is NOT connected to DOM (or was removed by React hydration)
+    isAttaching = true;
+    try {
+      if (panelElement) {
+        injectPanelBelowWhereToWatch(panelElement);
+        console.log('[qBit] Painel reinserido no DOM após hidratação.');
+      } else {
+        init();
+      }
+    } finally {
+      setTimeout(() => { isAttaching = false; }, 50);
+    }
   }
 
   function renderPanel() {
@@ -304,6 +385,10 @@
     panel.appendChild(header);
     panel.appendChild(searchBar);
     panel.appendChild(body);
+
+    panelElement = panel;
+    panelBody = body;
+    panelSearchInput = searchInput;
 
     // Safe injection below Where to watch (or below poster)
     let injected = false;
@@ -523,8 +608,8 @@
 
   async function performSearch(query) {
     currentSearchQuery = query;
-    const body = document.getElementById('qbit-panel-body');
-    const searchInput = document.querySelector('.qbit-search-input');
+    const body = panelBody || document.getElementById('qbit-panel-body');
+    const searchInput = panelSearchInput || document.querySelector('.qbit-search-input');
     if (searchInput) searchInput.value = query;
 
     if (!body) return;
@@ -543,6 +628,7 @@
       }
 
       const results = resp.data && resp.data.results ? resp.data.results : [];
+      cachedResults = results;
       if (results.length === 0) {
         setBodyStateEmpty(body, query);
       } else {
@@ -587,7 +673,16 @@
       }
 
       if (searchInput) searchInput.value = query;
-      performSearch(query);
+
+      if (cachedResults !== null && currentSearchQuery === query) {
+        if (cachedResults.length === 0) {
+          setBodyStateEmpty(body, query);
+        } else {
+          setBodyStateResults(body, cachedResults);
+        }
+      } else {
+        performSearch(query);
+      }
     } catch (err) {
       console.error('[qBit] Erro durante init:', err);
     }
@@ -602,21 +697,61 @@
     }
   });
 
-  // Observe SPA navigation changes
-  const observer = new MutationObserver(() => {
+  // Debounced helper to keep panel alive and positioned
+  let attachTimeout = null;
+  function scheduleEnsurePanel() {
+    if (attachTimeout) return;
+    attachTimeout = setTimeout(() => {
+      attachTimeout = null;
+      ensurePanelInDOM();
+    }, 100);
+  }
+
+  // Observe DOM modifications and SPA navigation
+  const observer = new MutationObserver((mutations) => {
+    // 1. Check SPA navigation
     if (window.location.pathname !== currentFilmUrl) {
       currentFilmUrl = window.location.pathname;
-      if (currentFilmUrl.startsWith('/film/')) {
-        setTimeout(init, 300);
+      cachedResults = null;
+      currentSearchQuery = '';
+      if (panelElement && panelElement.parentNode) {
+        panelElement.remove();
       }
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
+      panelElement = null;
+      panelBody = null;
+      panelSearchInput = null;
 
-  // Initial load
+      if (currentFilmUrl.startsWith('/film/')) {
+        setTimeout(init, 200);
+      }
+      return;
+    }
+
+    if (!currentFilmUrl.startsWith('/film/')) return;
+
+    // 2. Ignore mutations occurring strictly inside our own panel
+    let onlyOurPanel = true;
+    for (const m of mutations) {
+      if (m.target && m.target.closest && m.target.closest('#qbit-letterboxd-panel')) {
+        continue;
+      }
+      onlyOurPanel = false;
+      break;
+    }
+    if (onlyOurPanel) return;
+
+    // 3. Ensure panel remains attached and correctly placed below Where to Watch
+    scheduleEnsurePanel();
+  });
+
+  // Initial load & observation
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => {
+      init();
+      observer.observe(document.body, { childList: true, subtree: true });
+    });
   } else {
     init();
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 })();
