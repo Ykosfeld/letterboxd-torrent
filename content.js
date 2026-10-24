@@ -111,32 +111,61 @@
      3. DOM Locators & UI Construction (Strict XSS Prevention)
      ========================================================================== */
 
+  function isPageRootContainer(el) {
+    if (!el) return true;
+    if (el === document.body || el === document.documentElement) return true;
+    if (el.id === 'content' || el.id === 'main' || (el.classList && (el.classList.contains('content-wrap') || el.classList.contains('site-body')))) {
+      return true;
+    }
+    return false;
+  }
+
   function findWhereToWatchSection() {
     // 1. Direct standard IDs and classes on Letterboxd
-    const direct = document.querySelector(
-      '#watch, #watch-panel, #tab-watch, section.watch-options, section.where-to-watch, .watch-options, .js-watch-options, section.watch-panel, [data-track-category="WatchOptions"]'
-    );
-    if (direct) return direct;
+    const candidateSelectors = [
+      '#watch',
+      '#watch-panel',
+      '#tab-watch',
+      'section.watch-panel',
+      'section.watch-options',
+      'section.where-to-watch',
+      '.watch-options',
+      '.js-watch-options',
+      '[data-track-category="WatchOptions"]'
+    ];
 
-    // 2. Element containing JustWatch link
-    const jwLink = document.querySelector('a[href*="justwatch.com"]');
-    if (jwLink) {
-      const container = jwLink.closest('section, div.box, div[class*="watch"]');
-      if (container) return container;
+    for (const sel of candidateSelectors) {
+      const el = document.querySelector(sel);
+      if (el && !isPageRootContainer(el)) {
+        return el;
+      }
     }
 
-    // 3. Provider links or offers
-    const offer = document.querySelector('a[data-track-action="WatchOption"], div[data-testid="offer"]');
-    if (offer) {
-      const container = offer.closest('section, div.box, div[class*="watch"]');
-      if (container) return container;
+    // 2. Element containing JustWatch link or streaming offer
+    const offerLink = document.querySelector('a[href*="justwatch.com"], a[data-track-action="WatchOption"], div[data-testid="offer"]');
+    if (offerLink) {
+      let cur = offerLink.parentElement;
+      while (cur && !isPageRootContainer(cur.parentElement)) {
+        if (cur.tagName === 'SECTION' || (cur.classList && cur.classList.contains('box')) || /watch|service|where/i.test(cur.className || '')) {
+          return cur;
+        }
+        cur = cur.parentElement;
+      }
+      if (cur && !isPageRootContainer(cur)) return cur;
     }
 
-    // 4. Element with "Where to Watch" header text
-    const headings = document.querySelectorAll('h2, h3, h4, .section-heading, p.ui-block-heading');
+    // 3. Heading containing "Where to Watch"
+    const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .section-heading, p.ui-block-heading');
     for (const h of headings) {
-      if (/where to watch/i.test(h.textContent)) {
-        return h.closest('section, div.box, div[class*="watch"]') || h.parentElement;
+      if (/where to watch/i.test(h.textContent || '')) {
+        let cur = h.parentElement;
+        while (cur && !isPageRootContainer(cur.parentElement)) {
+          if (cur.tagName === 'SECTION' || (cur.classList && cur.classList.contains('box')) || /watch|service|where|panel/i.test(cur.className || '')) {
+            return cur;
+          }
+          cur = cur.parentElement;
+        }
+        if (cur && !isPageRootContainer(cur)) return cur;
       }
     }
 
@@ -145,13 +174,23 @@
 
   function findPosterContainer() {
     const poster = document.querySelector('.film-poster, .poster-list, section.poster-list, div.poster');
-    if (!poster) return null;
+    if (!poster || isPageRootContainer(poster)) return null;
 
-    // Check if there is a stats strip below poster
-    const stats = poster.parentElement.querySelector('.film-stats, ul.stats, .stats-strip') ||
-                  (poster.nextElementSibling && /stats/i.test(poster.nextElementSibling.className) ? poster.nextElementSibling : null);
+    try {
+      const parent = poster.parentElement;
+      if (parent && !isPageRootContainer(parent)) {
+        const stats = parent.querySelector('.film-stats, ul.stats, .stats-strip');
+        if (stats) return stats;
+      }
+      const next = poster.nextElementSibling;
+      if (next && (/stats/i.test(next.className || '') || (next.querySelector && next.querySelector('[class*="stat"], .icon-watched, .icon-liked')))) {
+        return next;
+      }
+    } catch {
+      // Fallback to poster itself
+    }
 
-    return stats || poster;
+    return poster;
   }
 
   function renderPanel() {
@@ -248,26 +287,34 @@
     panel.appendChild(searchBar);
     panel.appendChild(body);
 
-    // Injection position: below the film poster/stats and directly above "Where to watch" on the left column
-    const watchSection = findWhereToWatchSection();
-    const posterBlock = findPosterContainer();
+    // Safe injection into the left column
+    let injected = false;
+    try {
+      const watchSection = findWhereToWatchSection();
+      const posterBlock = findPosterContainer();
 
-    if (watchSection) {
-      const targetBlock = watchSection.closest('div.film-poster-overview > *, section, div.sidebar-block') || watchSection;
-      targetBlock.parentNode.insertBefore(panel, targetBlock);
-    } else if (posterBlock) {
-      const targetBlock = posterBlock.closest('div.film-poster-overview > *, section, div.sidebar-block') || posterBlock;
-      if (targetBlock.nextSibling) {
-        targetBlock.parentNode.insertBefore(panel, targetBlock.nextSibling);
-      } else {
-        targetBlock.parentNode.appendChild(panel);
+      if (watchSection && watchSection.parentNode) {
+        watchSection.parentNode.insertBefore(panel, watchSection);
+        console.log('[qBit] Injetado antes de Where to watch');
+        injected = true;
+      } else if (posterBlock && posterBlock.parentNode) {
+        if (posterBlock.nextSibling) {
+          posterBlock.parentNode.insertBefore(panel, posterBlock.nextSibling);
+        } else {
+          posterBlock.parentNode.appendChild(panel);
+        }
+        console.log('[qBit] Injetado após o cartaz/estatísticas');
+        injected = true;
       }
-    } else {
-      const fallback = document.querySelector('aside.sidebar, .col-main, #content');
+    } catch (err) {
+      console.warn('[qBit] Erro ao tentar injetar na coluna esquerda:', err);
+    }
+
+    if (!injected) {
+      const fallback = document.querySelector('aside.sidebar, .col-main, #content, body');
       if (fallback) {
         fallback.prepend(panel);
-      } else {
-        document.body.prepend(panel);
+        console.log('[qBit] Injetado via fallback');
       }
     }
 
@@ -508,42 +555,43 @@
   }
 
   async function init() {
-    const watchSection = findWhereToWatchSection();
-    const posterBlock = findPosterContainer();
-    const fallbackSidebar = document.querySelector('aside.sidebar, .col-main, #content');
-
-    if (!watchSection && !posterBlock && !fallbackSidebar) {
-      console.log('[qBit] Elementos do filme não encontrados na página atual.');
-      return;
-    }
-
-    const { body, searchInput } = renderPanel();
-
-    // Check configuration status first
-    let statusResp;
     try {
-      statusResp = await chrome.runtime.sendMessage({ type: 'GET_CONFIG_STATUS' });
-    } catch (e) {
-      console.warn('[qBit] Background worker inacessível:', e);
-      setBodyStateError(body, 'Background service worker indisponível.', '');
-      return;
-    }
+      console.log('[qBit] Inicializando extensão na página:', window.location.pathname);
+      const rendered = renderPanel();
+      if (!rendered || !rendered.body) {
+        console.warn('[qBit] Falha ao renderizar painel.');
+        return;
+      }
+      const { body, searchInput } = rendered;
 
-    if (!statusResp || !statusResp.ok || !statusResp.data || !statusResp.data.isConfigured) {
-      setBodyStateUnconfigured(body);
-      return;
-    }
+      // Check configuration status first
+      let statusResp;
+      try {
+        statusResp = await chrome.runtime.sendMessage({ type: 'GET_CONFIG_STATUS' });
+      } catch (e) {
+        console.warn('[qBit] Background worker inacessível:', e);
+        setBodyStateError(body, 'Background service worker indisponível. Recarregue a extensão.', '');
+        return;
+      }
 
-    // Extract metadata & trigger search
-    const meta = extractMovieMetadata();
-    const query = buildSearchQuery(meta, statusResp.data.queryTemplate);
-    if (!query) {
-      setBodyStateEmpty(body, '', 'Não foi possível extrair o título do filme.');
-      return;
-    }
+      if (!statusResp || !statusResp.ok || !statusResp.data || !statusResp.data.isConfigured) {
+        setBodyStateUnconfigured(body);
+        return;
+      }
 
-    if (searchInput) searchInput.value = query;
-    performSearch(query);
+      // Extract metadata & trigger search
+      const meta = extractMovieMetadata();
+      const query = buildSearchQuery(meta, statusResp.data.queryTemplate);
+      if (!query) {
+        setBodyStateEmpty(body, '', 'Não foi possível extrair o título do filme.');
+        return;
+      }
+
+      if (searchInput) searchInput.value = query;
+      performSearch(query);
+    } catch (err) {
+      console.error('[qBit] Erro durante init:', err);
+    }
   }
 
   // Cleanup on page unload
