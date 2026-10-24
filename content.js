@@ -111,73 +111,104 @@
      3. DOM Locators & UI Construction (Strict XSS Prevention)
      ========================================================================== */
 
-  function injectPanelIntoPosterColumn(panel) {
-    // 1. Locate the film poster on the left column
-    const poster = document.querySelector('.film-poster, .poster-list, section.poster-list, div[data-film-id]');
-    if (!poster) {
-      console.warn('[qBit] Cartaz do filme não encontrado.');
-      return false;
+  function isPageRootContainer(el) {
+    if (!el) return true;
+    if (el === document.body || el === document.documentElement) return true;
+    if (el.id === 'content' || el.id === 'main' || (el.classList && (el.classList.contains('content-wrap') || el.classList.contains('site-body')))) {
+      return true;
     }
+    return false;
+  }
 
-    // Find the top container of the poster inside the column
-    const posterBlock = poster.closest('.poster-list, section.poster-list, .film-poster-group, .film-poster') || poster;
-    const column = posterBlock.parentElement;
-    if (!column || column === document.body) {
-      console.warn('[qBit] Coluna do cartaz inválida.');
-      return false;
-    }
-
-    // 2. Check if a "Where to Watch" section exists inside this column or as a sibling
-    let watchSection = null;
-    const watchSelectors = [
-      'section.watch-options',
-      'section.where-to-watch',
-      '.watch-options',
-      '.js-watch-options',
-      'section.watch-panel',
-      '[data-track-category="WatchOptions"]',
-      'div[data-testid="offer"]'
-    ];
-
-    for (const sel of watchSelectors) {
-      const el = column.querySelector(sel);
-      if (el) {
-        watchSection = el;
-        break;
-      }
-    }
-
-    // Check textual heading in column children
-    if (!watchSection) {
-      for (const child of column.children) {
-        if (child !== posterBlock && /where to watch/i.test(child.textContent || '')) {
-          watchSection = child;
-          break;
+  function findWhereToWatchBox() {
+    // 1. Check textual heading "WHERE TO WATCH"
+    const allElements = document.querySelectorAll('h1, h2, h3, h4, h5, h6, .section-heading, p, div, header');
+    for (const el of allElements) {
+      if (el.children.length === 0 && /^where to watch$/i.test(el.textContent.trim())) {
+        let cur = el;
+        while (cur && cur.parentElement && !isPageRootContainer(cur.parentElement)) {
+          if (cur.tagName === 'SECTION' || (cur.classList && (cur.classList.contains('box') || cur.classList.contains('where-to-watch') || cur.classList.contains('watch-options') || /watch/i.test(cur.className || '')))) {
+            return cur;
+          }
+          cur = cur.parentElement;
         }
+        if (cur && !isPageRootContainer(cur)) return cur;
       }
     }
 
-    // 3. If Where to Watch is present in the column, insert right before it
-    if (watchSection && watchSection.parentNode === column) {
-      column.insertBefore(panel, watchSection);
-      console.log('[qBit] Injetado com sucesso na coluna esquerda acima de Where to Watch');
+    // 2. Check by JustWatch link
+    const jwLink = document.querySelector('a[href*="justwatch.com"]');
+    if (jwLink) {
+      let cur = jwLink;
+      while (cur && cur.parentElement && !isPageRootContainer(cur.parentElement)) {
+        if (cur.tagName === 'SECTION' || (cur.classList && (cur.classList.contains('box') || /watch/i.test(cur.className || '')))) {
+          return cur;
+        }
+        cur = cur.parentElement;
+      }
+      if (cur && !isPageRootContainer(cur)) return cur;
+    }
+
+    // 3. Check by standard class names
+    const standard = document.querySelector('section.watch-options, section.where-to-watch, .watch-options, .js-watch-options, section.watch-panel, [data-track-category="WatchOptions"]');
+    if (standard && !isPageRootContainer(standard)) {
+      return standard;
+    }
+
+    return null;
+  }
+
+  function injectPanelBelowWhereToWatch(panel) {
+    // 1. Try to find the "Where to watch" box and insert BELOW it
+    const watchBox = findWhereToWatchBox();
+    if (watchBox && watchBox.parentNode && !isPageRootContainer(watchBox.parentNode)) {
+      if (watchBox.nextSibling) {
+        watchBox.parentNode.insertBefore(panel, watchBox.nextSibling);
+      } else {
+        watchBox.parentNode.appendChild(panel);
+      }
+      console.log('[qBit] Injetado com sucesso abaixo de Where to Watch:', watchBox);
       return true;
     }
 
-    // 4. Otherwise, insert right below the poster and its stats line
-    let insertAfter = posterBlock;
-    const next = posterBlock.nextElementSibling;
-    if (next && (/stats/i.test(next.className || '') || (next.querySelector && next.querySelector('[class*="stat"], .icon-watched, .icon-liked')))) {
-      insertAfter = next;
+    // 2. Fallback for films without Where to Watch (e.g. unreleased films like Sally 2025):
+    // Insert below the poster and its stats
+    const poster = document.querySelector('.film-poster, .poster-list, section.poster-list, div[data-film-id]');
+    if (poster) {
+      let cur = poster;
+      while (cur && cur.parentElement && !isPageRootContainer(cur.parentElement)) {
+        if (cur.parentElement.classList && (cur.parentElement.classList.contains('col-6') || cur.parentElement.classList.contains('film-poster-overview') || cur.parentElement.classList.contains('poster-list'))) {
+          break;
+        }
+        cur = cur.parentElement;
+      }
+
+      let insertAfter = cur;
+      const next = cur.nextElementSibling;
+      if (next && (/stats/i.test(next.className || '') || (next.querySelector && next.querySelector('[class*="stat"], .icon-watched, .icon-liked')))) {
+        insertAfter = next;
+      }
+
+      if (insertAfter && insertAfter.parentNode && !isPageRootContainer(insertAfter.parentNode)) {
+        if (insertAfter.nextSibling) {
+          insertAfter.parentNode.insertBefore(panel, insertAfter.nextSibling);
+        } else {
+          insertAfter.parentNode.appendChild(panel);
+        }
+        console.log('[qBit] Injetado abaixo do cartaz/stats (sem Where to Watch):', insertAfter);
+        return true;
+      }
     }
 
-    if (insertAfter.nextSibling) {
-      column.insertBefore(panel, insertAfter.nextSibling);
-    } else {
-      column.appendChild(panel);
+    // 3. Ultimate safe fallback: right sidebar or main container
+    const fallback = document.querySelector('aside.sidebar, .col-main, #content');
+    if (fallback) {
+      fallback.prepend(panel);
+      console.log('[qBit] Injetado via fallback em:', fallback);
+      return true;
     }
-    console.log('[qBit] Injetado com sucesso na coluna esquerda abaixo do cartaz/stats');
-    return true;
+
+    return false;
   }
 
   function renderPanel() {
@@ -274,20 +305,16 @@
     panel.appendChild(searchBar);
     panel.appendChild(body);
 
-    // Safe injection into the left column
+    // Safe injection below Where to watch (or below poster)
     let injected = false;
     try {
-      injected = injectPanelIntoPosterColumn(panel);
+      injected = injectPanelBelowWhereToWatch(panel);
     } catch (err) {
-      console.warn('[qBit] Erro ao injetar na coluna do cartaz:', err);
+      console.warn('[qBit] Erro ao injetar painel:', err);
     }
 
     if (!injected) {
-      const fallback = document.querySelector('aside.sidebar, .col-main, #content, body');
-      if (fallback) {
-        fallback.prepend(panel);
-        console.log('[qBit] Injetado via fallback em:', fallback);
-      }
+      document.body.appendChild(panel);
     }
 
     return { panel, body, searchInput, searchBar };

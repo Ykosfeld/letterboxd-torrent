@@ -94,7 +94,7 @@ test('buildSearchQuery handles templates and fallbacks', () => {
   assert.strictEqual(buildSearchQuery(metaNoImdb, '{imdbId}'), 'Heat 1995');
 });
 
-test('determineInsertionTarget targets left column before Where to watch section, avoiding right sidebar', () => {
+test('determineInsertionTarget targets left column AFTER (below) Where to watch section', () => {
   function createMockPage(hasWatch, hasPoster, hasRightSidebar = true) {
     let poster = null;
     let watch = null;
@@ -141,11 +141,11 @@ test('determineInsertionTarget targets left column before Where to watch section
   }
 
   function getInsertionTarget(doc) {
-    const watchSection = doc.querySelector('#watch, #watch-panel, #tab-watch, section.watch-options, section.where-to-watch, .watch-options');
+    const watchSection = doc.querySelector('section.watch-options, section.where-to-watch, .watch-options');
     const posterElement = doc.querySelector('.poster-list, .film-poster, section.poster-list, div.poster');
 
     if (watchSection) {
-      return { position: 'before', target: watchSection, column: 'left' };
+      return { position: 'after', target: watchSection, column: 'left' };
     } else if (posterElement) {
       return { position: 'after', target: posterElement, column: 'left' };
     }
@@ -153,10 +153,10 @@ test('determineInsertionTarget targets left column before Where to watch section
     return { position: 'prepend', target: fallback, column: 'right' };
   }
 
-  // 1. Where to watch present on left column: must insert BEFORE watch section on left column
+  // 1. Where to watch present on left column: must insert AFTER (below) watch section on left column
   const case1 = createMockPage(true, true, true);
   const target1 = getInsertionTarget(case1.doc);
-  assert.strictEqual(target1.position, 'before');
+  assert.strictEqual(target1.position, 'after');
   assert.strictEqual(target1.target.id, 'watch-options-section');
   assert.strictEqual(target1.column, 'left');
 
