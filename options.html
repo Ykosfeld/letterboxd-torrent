@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurações - Letterboxd qBittorrent Search</title>
+  <style>
+    :root {
+      --bg-color: #14181c;
+      --card-bg: #1e252d;
+      --card-border: #2c3440;
+      --input-bg: #283038;
+      --input-border: #445566;
+      --text-main: #ffffff;
+      --text-muted: #99aabb;
+      --green-lb: #00e054;
+      --green-lb-hover: #00c749;
+      --orange-lb: #ff8000;
+      --blue-lb: #40bcf4;
+      --danger: #ff4d4d;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      padding: 32px 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .logo-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      background: #14181c;
+      border: 1px solid var(--card-border);
+      border-radius: 50%;
+    }
+
+    .header-text h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .header-text p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .label-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      background-color: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 4px;
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--blue-lb);
+    }
+
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background-color: var(--input-bg);
+      border: 1px solid var(--card-border);
+      padding: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .radio-option:hover {
+      border-color: var(--input-border);
+    }
+
+    .radio-option input[type="radio"] {
+      margin-top: 3px;
+      accent-color: var(--green-lb);
+      cursor: pointer;
+    }
+
+    .radio-content {
+      font-size: 13px;
+    }
+
+    .radio-content strong {
+      color: var(--text-main);
+      display: block;
+    }
+
+    .radio-content span {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .btn-submit {
+      width: 100%;
+      background-color: var(--green-lb);
+      color: #14181c;
+      font-weight: 700;
+      font-size: 15px;
+      border: none;
+      padding: 14px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .btn-submit:hover {
+      background-color: var(--green-lb-hover);
+    }
+
+    .btn-submit:active {
+      transform: scale(0.99);
+    }
+
+    .btn-submit:disabled {
+      background-color: #445566;
+      color: #8899aa;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status-alert {
+      display: none;
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .status-alert.success {
+      display: block;
+      background-color: rgba(0, 224, 84, 0.12);
+      border: 1px solid var(--green-lb);
+      color: #70ff9c;
+    }
+
+    .status-alert.error {
+      display: block;
+      background-color: rgba(255, 77, 77, 0.12);
+      border: 1px solid var(--danger);
+      color: #ff9999;
+    }
+
+    .spinner {
+      border: 2px solid rgba(20, 24, 28, 0.3);
+      border-top: 2px solid #14181c;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .security-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      background-color: rgba(0, 224, 84, 0.15);
+      color: var(--green-lb);
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-badge">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="6" cy="6" r="3" fill="#ff8000"/>
+          <circle cx="12" cy="6" r="3" fill="#00e054"/>
+          <circle cx="18" cy="6" r="3" fill="#40bcf4"/>
+          <path d="M12 11V18M12 18L8 14M12 18L16 14" stroke="#00e054" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="header-text">
+        <h1>Letterboxd + qBittorrent Search</h1>
+        <p>Configuração de Conexão Segura e Parâmetros de Busca</p>
+      </div>
+    </header>
+
+    <form id="options-form">
+      <!-- 1. Servidor e Autenticação -->
+      <section class="card">
+        <div class="card-title">
+          <span>Servidor qBittorrent</span>
+          <span class="security-badge">CORS / CSRF Bypass Ativo</span>
+        </div>
+
+        <div class="form-group">
+          <label for="baseUrl">URL Base do qBittorrent Web UI</label>
+          <input type="text" id="baseUrl" placeholder="http://localhost:8080 ou http://192.168.1.100:8080" required>
+          <div class="label-desc">Informe o protocolo e porta. A extensão reescreverá Origin/Referer automaticamente.</div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="username">Nome de Usuário</label>
+            <input type="text" id="username" placeholder="admin" required>
+          </div>
+          <div class="form-group">
+            <label for="password">Senha</label>
+            <input type="password" id="password" placeholder="••••••••" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Armazenamento da Senha</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="saveMode" value="session" checked>
+              <div class="radio-content">
+                <strong>Modo Sessão Segura (Recomendado)</strong>
+                <span>A senha fica apenas na memória da sessão do navegador. Não é gravada em disco.</span>
+              </div>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="saveMode" value="encrypted">
+              <div class="radio-content">
+                <strong>Modo Criptografado Local (AES-GCM)</strong>
+                <span>A senha é cifrada com chave de 256 bits via Web Crypto API e salva localmente.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Parâmetros de Busca -->
+      <section class="card">
+        <div class="card-title">Parâmetros de Busca</div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="maxResults">Máximo de Resultados ($N$)</label>
+            <input type="number" id="maxResults" min="1" max="25" value="5">
+            <div class="label-desc">Número de torrents listados na sidebar (1 a 25).</div>
+          </div>
+          <div class="form-group">
+            <label for="queryTemplate">Formato da Consulta</label>
+            <select id="queryTemplate">
+              <option value="{title} {year}">{title} {year} (Ex: Heat 1995)</option>
+              <option value="{imdbId}">{imdbId} (Ex: tt0113277 para indexadores compatíveis)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="searchPlugins">Plugins de Busca</label>
+            <input type="text" id="searchPlugins" value="enabled" placeholder="enabled ou all">
+            <div class="label-desc">Ex: "enabled", "all" ou nomes específicos separados por vírgula.</div>
+          </div>
+          <div class="form-group">
+            <label for="searchCategory">Categoria de Busca</label>
+            <input type="text" id="searchCategory" value="all" placeholder="all ou movies">
+            <div class="label-desc">Filtro de categoria no motor de busca do qBittorrent.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Parâmetros de Download -->
+      <section class="card">
+        <div class="card-title">Opções ao Adicionar Torrent</div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label for="addCategory">Categoria no qBittorrent</label>
+            <input type="text" id="addCategory" placeholder="Ex: filmes (opcional)">
+          </div>
+          <div class="form-group">
+            <label for="addTags">Tags</label>
+            <input type="text" id="addTags" value="letterboxd" placeholder="letterboxd">
+          </div>
+        </div>
+      </section>
+
+      <!-- Ação -->
+      <button type="submit" id="btn-save" class="btn-submit">
+        <span id="btn-icon">✓</span>
+        <span id="btn-text">Testar Conexão &amp; Salvar</span>
+      </button>
+
+      <div id="status-alert" class="status-alert"></div>
+    </form>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

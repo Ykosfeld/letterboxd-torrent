@@ -1,0 +1,376 @@
+/**
+ * Letterboxd + qBittorrent Search - Stylesheet
+ * Native Letterboxd Dark Theme Integration
+ */
+
+:root {
+  --qbit-bg: #14181c;
+  --qbit-panel-bg: #1a2128;
+  --qbit-card-bg: #202830;
+  --qbit-border: #2c3440;
+  --qbit-border-hover: #445566;
+  --qbit-text-main: #ffffff;
+  --qbit-text-muted: #99aabb;
+  --qbit-green: #00e054;
+  --qbit-green-hover: #00c749;
+  --qbit-orange: #ff8000;
+  --qbit-blue: #40bcf4;
+  --qbit-danger: #ff5555;
+}
+
+/* Main Section Container */
+.qbit-letterboxd-panel {
+  background-color: var(--qbit-panel-bg);
+  border: 1px solid var(--qbit-border);
+  border-radius: 4px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--qbit-text-main);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Header */
+.qbit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background-color: var(--qbit-bg);
+  border-bottom: 1px solid var(--qbit-border);
+}
+
+.qbit-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qbit-logo-dots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.qbit-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.qbit-dot.orange { background-color: var(--qbit-orange); }
+.qbit-dot.green { background-color: var(--qbit-green); }
+.qbit-dot.blue { background-color: var(--qbit-blue); }
+
+.qbit-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--qbit-text-muted);
+}
+
+.qbit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qbit-icon-btn {
+  background: none;
+  border: none;
+  color: var(--qbit-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.qbit-icon-btn:hover {
+  color: var(--qbit-blue);
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Search Edit Bar (Collapsible) */
+.qbit-search-bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  background-color: var(--qbit-bg);
+  border-bottom: 1px solid var(--qbit-border);
+}
+
+.qbit-search-bar.hidden {
+  display: none !important;
+}
+
+.qbit-search-input {
+  flex: 1;
+  background-color: var(--qbit-card-bg);
+  border: 1px solid var(--qbit-border);
+  border-radius: 3px;
+  color: var(--qbit-text-main);
+  padding: 6px 10px;
+  font-size: 12px;
+  outline: none;
+}
+
+.qbit-search-input:focus {
+  border-color: var(--qbit-blue);
+}
+
+.qbit-search-btn {
+  background-color: var(--qbit-card-bg);
+  border: 1px solid var(--qbit-border);
+  color: var(--qbit-text-main);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.qbit-search-btn:hover {
+  border-color: var(--qbit-green);
+  color: var(--qbit-green);
+}
+
+/* Panel Body */
+.qbit-body {
+  padding: 10px 14px;
+}
+
+/* State: Unconfigured */
+.qbit-unconfigured {
+  text-align: center;
+  padding: 16px 8px;
+}
+
+.qbit-unconfigured p {
+  font-size: 13px;
+  color: var(--qbit-text-muted);
+  margin-bottom: 12px;
+}
+
+.qbit-btn-primary {
+  display: inline-block;
+  background-color: var(--qbit-green);
+  color: #14181c;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: 3px;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.15s;
+}
+
+.qbit-btn-primary:hover {
+  background-color: var(--qbit-green-hover);
+}
+
+/* State: Loading / Searching */
+.qbit-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.qbit-spinner {
+  border: 2px solid rgba(255, 128, 0, 0.2);
+  border-top: 2px solid var(--qbit-orange);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  animation: qbit-spin 0.8s linear infinite;
+}
+
+@keyframes qbit-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.qbit-loading-text {
+  font-size: 12px;
+  color: var(--qbit-text-muted);
+}
+
+.qbit-loading-query {
+  color: var(--qbit-text-main);
+  font-weight: 600;
+}
+
+/* State: Results List */
+.qbit-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qbit-result-item {
+  background-color: var(--qbit-card-bg);
+  border: 1px solid var(--qbit-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  transition: border-color 0.15s;
+}
+
+.qbit-result-item:hover {
+  border-color: var(--qbit-border-hover);
+}
+
+.qbit-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.qbit-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.qbit-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--qbit-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.qbit-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--qbit-text-muted);
+}
+
+.qbit-seeders {
+  color: var(--qbit-green);
+  font-weight: 600;
+}
+
+.qbit-leechers {
+  color: var(--qbit-text-muted);
+}
+
+/* Badges */
+.qbit-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 2px;
+  letter-spacing: 0.03em;
+  background-color: #2c3440;
+  color: #bcd;
+  flex-shrink: 0;
+}
+
+.qbit-badge.badge-4k {
+  background-color: rgba(255, 128, 0, 0.2);
+  color: var(--qbit-orange);
+  border: 1px solid rgba(255, 128, 0, 0.4);
+}
+
+.qbit-badge.badge-1080p {
+  background-color: rgba(64, 188, 244, 0.15);
+  color: var(--qbit-blue);
+  border: 1px solid rgba(64, 188, 244, 0.3);
+}
+
+.qbit-badge.badge-remux {
+  background-color: rgba(0, 224, 84, 0.15);
+  color: var(--qbit-green);
+  border: 1px solid rgba(0, 224, 84, 0.3);
+}
+
+/* Download Action Button */
+.qbit-btn-download {
+  background-color: #2c3440;
+  color: var(--qbit-text-main);
+  border: 1px solid #3c4856;
+  border-radius: 3px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.qbit-btn-download:hover:not(:disabled) {
+  background-color: var(--qbit-green);
+  color: #14181c;
+  border-color: var(--qbit-green);
+}
+
+.qbit-btn-download.downloading {
+  background-color: #2c3440;
+  color: var(--qbit-orange);
+  border-color: var(--qbit-orange);
+  cursor: wait;
+}
+
+.qbit-btn-download.added {
+  background-color: rgba(0, 224, 84, 0.15);
+  color: var(--qbit-green);
+  border-color: var(--qbit-green);
+  cursor: default;
+}
+
+.qbit-btn-download:disabled {
+  opacity: 0.85;
+}
+
+/* State: Empty or Error */
+.qbit-empty,
+.qbit-error {
+  text-align: center;
+  padding: 14px 6px;
+  font-size: 12px;
+}
+
+.qbit-empty p {
+  color: var(--qbit-text-muted);
+  margin-bottom: 8px;
+}
+
+.qbit-error {
+  color: var(--qbit-danger);
+}
+
+.qbit-retry-btn {
+  background: none;
+  border: 1px solid var(--qbit-border);
+  color: var(--qbit-blue);
+  padding: 4px 10px;
+  border-radius: 3px;
+  font-size: 11px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: all 0.15s;
+}
+
+.qbit-retry-btn:hover {
+  border-color: var(--qbit-blue);
+}
