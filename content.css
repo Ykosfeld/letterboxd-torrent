@@ -260,6 +260,13 @@
   overflow: hidden;
   word-break: break-word;
   width: 100%;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+a.qbit-item-name:hover {
+  color: var(--qbit-blue);
+  text-decoration: underline;
 }
 
 .qbit-size {
@@ -343,6 +350,13 @@
   background-color: rgba(0, 224, 84, 0.15);
   color: var(--qbit-green);
   border-color: var(--qbit-green);
+  cursor: default;
+}
+
+.qbit-btn-download.opened {
+  background-color: rgba(64, 188, 244, 0.15);
+  color: var(--qbit-blue);
+  border-color: var(--qbit-blue);
   cursor: default;
 }
 

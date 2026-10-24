@@ -555,12 +555,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       case 'ADD_TORRENT': {
-        const { fileUrl } = message.payload;
+        let { fileUrl, descrLink } = message.payload;
         const settings = await getSettings();
         const password = await getPassword(settings.saveMode);
 
         if (!settings.baseUrl || !password) {
           throw new Error('qBittorrent não configurado.');
+        }
+
+        // If fileUrl is an HTML page (like LimeTorrents details page) or not a magnet link,
+        // attempt to fetch the page and extract the real magnet link
+        if (fileUrl && (/\.html?(\?.*)?$/i.test(fileUrl) || (!fileUrl.startsWith('magnet:') && !fileUrl.includes('.torrent')))) {
+          try {
+            const pageRes = await fetch(fileUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+            if (pageRes.ok) {
+              const html = await pageRes.text();
+              const magnetMatch = html.match(/magnet:\?xt=urn:btih:[a-zA-Z0-9]+[^"'\s<>]*/i);
+              if (magnetMatch) {
+                fileUrl = magnetMatch[0];
+                console.log('[qBit] Magnet link extraído com sucesso da página:', fileUrl);
+              }
+            }
+          } catch (e) {
+            console.warn('[qBit] Não foi possível fazer scraping direto do magnet:', e);
+          }
+        }
+
+        // If it is still an HTML page, sending it to qBittorrent will fail with bdecode:4 error
+        if (fileUrl && /\.html?(\?.*)?$/i.test(fileUrl)) {
+          if (chrome.tabs && chrome.tabs.create) {
+            await chrome.tabs.create({ url: fileUrl });
+          }
+          return {
+            success: true,
+            openedInTab: true,
+            message: 'O indexador (ex: LimeTorrents) forneceu uma página web (.html) em vez de um link magnet/torrent direto.\n\nA página foi aberta em uma nova aba para você clicar no botão Magnet!',
+          };
         }
 
         const api = new QBitApi(settings.baseUrl, settings.username, password);

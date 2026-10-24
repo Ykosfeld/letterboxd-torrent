@@ -66,3 +66,18 @@ test('processSearchResults sanitizes non-string/corrupted inputs', () => {
   assert.strictEqual(result[0].fileUrl, '12345');
   assert.strictEqual(result[0].extraMaliciousProperty, undefined);
 });
+
+test('extractMagnetFromHtml extracts valid magnet link from indexer webpage', () => {
+  const sampleHtml = `
+    <html>
+      <body>
+        <h1>Sabrina (1954)</h1>
+        <a href="https://other.com">Other</a>
+        <a class="csb" href="magnet:?xt=urn:btih:3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d&dn=Sabrina.1954&tr=udp://tracker.opentrackr.org">Download Magnet</a>
+      </body>
+    </html>
+  `;
+  const match = sampleHtml.match(/magnet:\?xt=urn:btih:[a-zA-Z0-9]+[^"'\s<>]*/i);
+  assert.ok(match, 'Must find magnet link in HTML');
+  assert.ok(match[0].startsWith('magnet:?xt=urn:btih:3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d'));
+});

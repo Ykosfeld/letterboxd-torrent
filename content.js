@@ -620,12 +620,21 @@
         try {
           const resp = await chrome.runtime.sendMessage({
             type: 'ADD_TORRENT',
-            payload: { fileUrl: item.fileUrl },
+            payload: { fileUrl: item.fileUrl, descrLink: item.descrLink },
           });
 
           if (resp && resp.ok && resp.data && resp.data.success) {
-            downloadBtn.className = 'qbit-btn-download added';
-            downloadBtn.textContent = '✓ Adicionado';
+            if (resp.data.openedInTab) {
+              downloadBtn.className = 'qbit-btn-download opened';
+              downloadBtn.textContent = '↗ Página aberta';
+              downloadBtn.title = 'A página foi aberta no navegador para você clicar no botão Magnet.';
+              if (resp.data.message) {
+                alert(resp.data.message);
+              }
+            } else {
+              downloadBtn.className = 'qbit-btn-download added';
+              downloadBtn.textContent = '✓ Adicionado';
+            }
           } else {
             const err = resp && resp.error ? resp.error : 'Erro desconhecido.';
             alert(`Falha ao adicionar download: ${err}`);
@@ -644,14 +653,20 @@
       topRow.appendChild(metaGroup);
       topRow.appendChild(downloadBtn);
 
-      // 2. Bottom row: Full width release name
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'qbit-item-name';
-      nameSpan.textContent = item.fileName;
-      nameSpan.title = item.fileName;
+      // 2. Bottom row: Full width release name (clickable to source tracker page)
+      const targetLink = item.descrLink || item.fileUrl || '';
+      const nameEl = document.createElement(targetLink ? 'a' : 'span');
+      nameEl.className = 'qbit-item-name';
+      nameEl.textContent = item.fileName;
+      nameEl.title = targetLink ? `${item.fileName} (Clique para abrir na fonte)` : item.fileName;
+      if (targetLink) {
+        nameEl.href = targetLink;
+        nameEl.target = '_blank';
+        nameEl.rel = 'noopener noreferrer';
+      }
 
       row.appendChild(topRow);
-      row.appendChild(nameSpan);
+      row.appendChild(nameEl);
       list.appendChild(row);
     });
 
