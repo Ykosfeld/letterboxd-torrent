@@ -41,9 +41,31 @@ function extractBadges(fileName) {
 }
 
 function buildSearchQuery(meta, template) {
-  if (template === '{imdbId}' && meta.imdbId) {
-    return meta.imdbId;
+  const tmpl = template || '{title} {year}';
+
+  if (tmpl.includes('{imdbId}')) {
+    if (meta.imdbId) {
+      return tmpl.replace('{imdbId}', meta.imdbId).trim();
+    }
+    if (tmpl === '{imdbId}') {
+      return meta.title && meta.year ? `${meta.title} ${meta.year}` : (meta.title || '');
+    }
   }
+
+  if (tmpl.includes('{title}') || tmpl.includes('{year}')) {
+    let query = tmpl;
+    if (meta.title) {
+      query = query.replace('{title}', meta.title);
+    }
+    if (meta.year) {
+      query = query.replace('{year}', meta.year);
+    } else {
+      query = query.replace('{year}', '');
+    }
+    query = query.replace(/\s+/g, ' ').trim();
+    return query || meta.title || '';
+  }
+
   if (meta.title && meta.year) {
     return `${meta.title} ${meta.year}`;
   }
@@ -86,12 +108,20 @@ test('buildSearchQuery handles templates and fallbacks', () => {
   // Standard template
   assert.strictEqual(buildSearchQuery(meta, '{title} {year}'), 'Heat 1995');
 
+  // Modern film test
+  const metaModern = { title: 'Afternoons of Solitude', year: '2024', imdbId: '' };
+  assert.strictEqual(buildSearchQuery(metaModern, '{title} {year}'), 'Afternoons of Solitude 2024');
+
   // IMDb ID template
   assert.strictEqual(buildSearchQuery(meta, '{imdbId}'), 'tt0113277');
 
   // Fallback if IMDb ID is missing
   const metaNoImdb = { title: 'Heat', year: '1995', imdbId: '' };
   assert.strictEqual(buildSearchQuery(metaNoImdb, '{imdbId}'), 'Heat 1995');
+
+  // Fallback when year is missing
+  const metaNoYear = { title: 'Heat', year: '', imdbId: '' };
+  assert.strictEqual(buildSearchQuery(metaNoYear, '{title} {year}'), 'Heat');
 });
 
 test('determineInsertionTarget targets left column AFTER (below) Where to watch section', () => {

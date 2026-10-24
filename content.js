@@ -68,23 +68,96 @@
     let title = '';
     const titleEl = document.querySelector('h1.headline-1, .film-title-wrapper h1, h1[itemprop="name"]');
     if (titleEl) {
-      title = titleEl.textContent.trim();
-    } else {
+      const clone = titleEl.cloneNode(true);
+      const innerYear = clone.querySelector('small, .number, .releaseyear');
+      if (innerYear) innerYear.remove();
+      title = clone.textContent.trim();
+    }
+
+    if (!title) {
+      const posterData = document.querySelector('[data-item-name], [data-item-full-display-name]');
+      if (posterData) {
+        const attr = posterData.getAttribute('data-item-name') || posterData.getAttribute('data-item-full-display-name') || '';
+        title = attr.replace(/\s*\(\d{4}\).*$/, '').trim();
+      }
+    }
+
+    if (!title) {
       const ogTitle = document.querySelector('meta[property="og:title"]');
       if (ogTitle) {
         title = (ogTitle.getAttribute('content') || '').replace(/\s*\(\d{4}\).*$/, '').trim();
       }
     }
 
+    if (!title && document.title) {
+      title = document.title.replace(/\s*\(\d{4}\).*$/, '').replace(/ - Letterboxd.*$/, '').trim();
+    }
+
     // Clean any parenthesis year in title e.g. "Heat (1995)"
     title = title.replace(/\s*\(\d{4}\)$/, '').trim();
 
-    // 2. Release Year
+    // 2. Release Year (multi-source extraction)
     let year = '';
-    const yearEl = document.querySelector('.releaseyear a, .production-masthead .releaseyear, [itemprop="dateCreated"]');
-    if (yearEl) {
-      year = yearEl.textContent.trim();
-    } else {
+
+    // Source A: Modern Letterboxd year links (e.g. <small class="number"><a href="/films/year/2024/">2024</a></small>)
+    const yearLink = document.querySelector('a[href*="/films/year/"], small.number a, .releaseyear a, .production-masthead .releaseyear, [itemprop="dateCreated"]');
+    if (yearLink) {
+      const rawText = yearLink.textContent || yearLink.getAttribute('href') || '';
+      const match = rawText.match(/\b(18\d{2}|19\d{2}|20\d{2})\b/);
+      if (match) year = match[1];
+    }
+
+    // Source B: React LazyPoster data attributes (e.g. data-item-name="Afternoons of Solitude (2024)")
+    if (!year) {
+      const posterData = document.querySelector('[data-film-release-year], [data-item-name], [data-item-full-display-name]');
+      if (posterData) {
+        const attr = posterData.getAttribute('data-film-release-year') ||
+                     posterData.getAttribute('data-item-full-display-name') ||
+                     posterData.getAttribute('data-item-name') || '';
+        const match = attr.match(/\b(18\d{2}|19\d{2}|20\d{2})\b/);
+        if (match) year = match[1];
+      }
+    }
+
+    // Source C: og:title meta tag (e.g. "Afternoons of Solitude (2024)")
+    if (!year) {
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) {
+        const match = (ogTitle.getAttribute('content') || '').match(/\((\d{4})\)/);
+        if (match) year = match[1];
+      }
+    }
+
+    // Source D: document.title (e.g. "Afternoons of Solitude (2024)...")
+    if (!year && document.title) {
+      const match = document.title.match(/\((\d{4})\)/);
+      if (match) year = match[1];
+    }
+
+    // Source E: Schema.org JSON-LD
+    if (!year) {
+      try {
+        const ldScripts = document.querySelectorAll('script[type="application/ld+json"]');
+        for (const script of ldScripts) {
+          const data = JSON.parse(script.textContent || '{}');
+          if (data.releasedEvent && Array.isArray(data.releasedEvent)) {
+            const startDate = data.releasedEvent[0]?.startDate;
+            if (startDate && /^\d{4}/.test(startDate)) {
+              year = startDate.slice(0, 4);
+              break;
+            }
+          } else if (data.dateCreated && /^\d{4}/.test(data.dateCreated)) {
+            year = data.dateCreated.slice(0, 4);
+            break;
+          }
+        }
+      } catch {
+        // Ignored
+      }
+    }
+
+    // Source F: URL pathname slug with year (e.g. /film/heat-1995/)
+    if (!year) {
       const yearMatch = window.location.pathname.match(/-(\d{4})\/?$/);
       if (yearMatch) year = yearMatch[1];
     }
@@ -102,10 +175,31 @@
   }
 
   function buildSearchQuery(meta, template) {
-    if (template === '{imdbId}' && meta.imdbId) {
-      return meta.imdbId;
+    const tmpl = template || '{title} {year}';
+
+    if (tmpl.includes('{imdbId}')) {
+      if (meta.imdbId) {
+        return tmpl.replace('{imdbId}', meta.imdbId).trim();
+      }
+      if (tmpl === '{imdbId}') {
+        return meta.title && meta.year ? `${meta.title} ${meta.year}` : (meta.title || '');
+      }
     }
-    // Default: title and year
+
+    if (tmpl.includes('{title}') || tmpl.includes('{year}')) {
+      let query = tmpl;
+      if (meta.title) {
+        query = query.replace('{title}', meta.title);
+      }
+      if (meta.year) {
+        query = query.replace('{year}', meta.year);
+      } else {
+        query = query.replace('{year}', '');
+      }
+      query = query.replace(/\s+/g, ' ').trim();
+      return query || meta.title || '';
+    }
+
     if (meta.title && meta.year) {
       return `${meta.title} ${meta.year}`;
     }
@@ -667,6 +761,7 @@
       // Extract metadata & trigger search
       const meta = extractMovieMetadata();
       const query = buildSearchQuery(meta, statusResp.data.queryTemplate);
+      console.log('[qBit] Metadados extraídos:', meta, '| Query:', query);
       if (!query) {
         setBodyStateEmpty(body, '', 'Não foi possível extrair o título do filme.');
         return;
