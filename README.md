@@ -1,8 +1,12 @@
-# Letterboxd + qBittorrent Search (Manifest V3)
+<div align="center">
+  <img src="icons/icon128.png" alt="Letterboxd + qBittorrent Search Logo" width="96" height="96" />
+  <h1>Letterboxd + qBittorrent Search</h1>
+  <p><b>Extensão de navegador (Manifest V3) que integra as páginas de filmes do Letterboxd diretamente à Web API do qBittorrent.</b></p>
+</div>
 
-Extensão de navegador moderna que integra diretamente as páginas de filmes do **Letterboxd** (`https://letterboxd.com/film/*`) à Web API v2 do **qBittorrent**.
+---
 
-Ao acessar qualquer filme no Letterboxd, a extensão consulta os indexadores configurados no seu qBittorrent, lista os melhores torrents ordenados por *seeders* diretamente na barra lateral e permite iniciar o download com apenas 1 clique.
+Ao acessar qualquer filme no Letterboxd, a extensão consulta os indexadores configurados no seu qBittorrent, lista os melhores torrents ordenados por *seeders* diretamente na coluna esquerda e permite iniciar o download com apenas 1 clique.
 
 ---
 
